@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice System</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #f4f6f8;
+  padding: 20px;
+}
+
+.container {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 700px;
+  margin: auto;
+}
+
+h2 {
+  margin-bottom: 20px;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #4e79a7;
+  color: white;
+  border: none;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.invoice {
+  margin-top: 30px;
+  padding: 20px;
+  background: white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Invoice Generator</h2>
+
+<select id="clientSelect"></select>
+<input id="newClient" placeholder="Add new client">
+<button onclick="addClient()">Add Client</button>
+
+<input id="shipTo" placeholder="Ship To">
+<input id="invoiceNumber" placeholder="Invoice Number">
+<input type="date" id="date">
+
+<hr>
+
+<h3>Stock</h3>
+<input id="stockName" placeholder="Item name">
+<input id="stockPrice" placeholder="Price">
+<button onclick="addStock()">Add Stock</button>
+
+<hr>
+
+<h3>Invoice Lines</h3>
+<div id="lines"></div>
+<button onclick="addLine()">+ Add Line</button>
+
+<hr>
+
+<button onclick="generateInvoice()">Generate Invoice</button>
+<button onclick="downloadPDF()">Download PDF</button>
+
+</div>
+
+<div id="invoicePreview" class="invoice"></div>
+
+<script>
+let clients = JSON.parse(localStorage.getItem("clients")) || [];
+let stock = JSON.parse(localStorage.getItem("stock")) || [];
+
+function save() {
+  localStorage.setItem("clients", JSON.stringify(clients));
+  localStorage.setItem("stock", JSON.stringify(stock));
+}
+
+function loadClients() {
+  const select = document.getElementById("clientSelect");
+  select.innerHTML = "";
+  clients.forEach(c => {
+    let opt = document.createElement("option");
+    opt.textContent = c;
+    select.appendChild(opt);
+  });
+}
+
+function addClient() {
+  const name = document.getElementById("newClient").value;
+  if (!name) return;
+  clients.push(name);
+  save();
+  loadClients();
+}
+
+function addStock() {
+  const name = stockName.value;
+  const price = parseFloat(stockPrice.value);
+  if (!name || !price) return;
+  stock.push({ name, price });
+  save();
+}
+
+function addLine() {
+  const div = document.createElement("div");
+
+  let select = document.createElement("select");
+  stock.forEach(s => {
+    let opt = document.createElement("option");
+    opt.value = s.price;
+    opt.textContent = s.name;
+    select.appendChild(opt);
+  });
+
+  let qty = document.createElement("input");
+  qty.placeholder = "Qty";
+
+  let price = document.createElement("input");
+  price.placeholder = "Price";
+
+  select.onchange = () => {
+    price.value = select.value;
+  };
+
+  div.appendChild(select);
+  div.appendChild(qty);
+  div.appendChild(price);
+
+  document.getElementById("lines").appendChild(div);
+}
+
+function generateInvoice() {
+  const client = clientSelect.value;
+  const ship = shipTo.value;
+  const num = invoiceNumber.value;
+  const dateVal = date.value;
+
+  let total = 0;
+  let html = `<h2>INVOICE</h2>`;
+  html += `<p>${client}</p>`;
+  html += `<p>${ship}</p>`;
+  html += `<p>${num}</p>`;
+  html += `<p>${dateVal}</p>`;
+
+  document.querySelectorAll("#lines div").forEach(line => {
+    let name = line.children[0].selectedOptions[0].text;
+    let qty = parseFloat(line.children[1].value);
+    let price = parseFloat(line.children[2].value);
+
+    let amount = qty * price;
+    total += amount;
+
+    html += `<p>${name} - ${qty} x ${price} = ${amount}</p>`;
+  });
+
+  html += `<h3>Total: ${total}</h3>`;
+
+  document.getElementById("invoicePreview").innerHTML = html;
+}
+
+function downloadPDF() {
+  window.print();
+}
+
+loadClients();
+</script>
+
+</body>
+</html>
