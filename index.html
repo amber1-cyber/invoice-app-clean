@@ -452,7 +452,15 @@
     const modal = document.getElementById('previewModal');
     const preview = document.getElementById('invoicePreview');
     const element = preview.firstElementChild;
-    const invoiceNum = document.getElementById('invoiceNumber').value;
+
+    if (!element) {
+        alert('Please preview the invoice first.');
+        return;
+    }
+
+    const invoiceNum = document.getElementById('invoiceNumber').value || '000';
+    const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().split('T')[0];
+    const fileName = `Invoice_${invoiceNum}_${invoiceDate}.pdf`;
 
     modal.scrollTop = 0;
     preview.scrollTop = 0;
@@ -460,7 +468,7 @@
 
     const opt = {
         margin: 0,
-        filename: `Invoice_${invoiceNum}.pdf`,
+        filename: fileName,
         image: { type: 'png', quality: 1 },
         html2canvas: {
             scale: 4,
@@ -497,51 +505,59 @@
 
 
 
-        function saveInvoice() {
-            const clientName = document.getElementById('clientSelect').value;
-            const invoiceDate = document.getElementById('invoiceDate').value;
-            const dueDate = document.getElementById('dueDate').value;
-            
-            if (!clientName) {
-                alert('Please select a client');
-                return;
-            }
-            if (!invoiceDate || !dueDate) {
-                alert('Please fill in all required fields');
-                return;
-            }
 
-            const total = calculateTotals();
-            if (total <= 0) {
-                alert('Please add at least one item');
-                return;
-            }
+        async function saveInvoice() {
+    const clientName = document.getElementById('clientSelect').value;
+    const invoiceDate = document.getElementById('invoiceDate').value;
+    const dueDate = document.getElementById('dueDate').value;
 
-            const invoice = {
-                id: DB.getNextInvoiceNum(),
-                invoiceNumber: document.getElementById('invoiceNumber').value,
-                clientName: clientName,
-                shipTo: document.getElementById('shipTo').value,
-                invoiceDate: invoiceDate,
-                dueDate: dueDate,
-                items: getInvoiceData(),
-                total: total,
-                createdAt: new Date().toISOString()
-            };
+    if (!clientName) {
+        alert('Please select a client');
+        return;
+    }
 
-            const invoices = DB.getInvoices();
-            invoices.push(invoice);
-            DB.saveInvoices(invoices);
-            DB.saveNextInvoiceNum(DB.getNextInvoiceNum() + 1);
+    if (!invoiceDate || !dueDate) {
+        alert('Please fill in all required fields');
+        return;
+    }
 
-            alert('Invoice saved successfully!');
-            
-            document.getElementById('invoiceNumber').value = DB.getNextInvoiceNum();
-            document.getElementById('shipTo').value = '';
-            document.getElementById('invoiceItems').innerHTML = '';
-            addLineItem();
-            calculateTotals();
-        }
+    const total = calculateTotals();
+    if (total <= 0) {
+        alert('Please add at least one item');
+        return;
+    }
+
+    const invoice = {
+        invoice_number: document.getElementById('invoiceNumber').value,
+        client: clientName,
+        ship: document.getElementById('shipTo').value,
+        total: total,
+        date: invoiceDate,
+        due_date: dueDate,
+        items: getInvoiceData()
+    };
+
+    const { error } = await supabaseClient
+        .from('invoices')
+        .insert([invoice]);
+
+    if (error) {
+        console.error(error);
+        alert('Error saving invoice');
+        return;
+    }
+
+    DB.saveNextInvoiceNum(DB.getNextInvoiceNum() + 1);
+
+    alert('Invoice saved successfully!');
+
+    document.getElementById('invoiceNumber').value = DB.getNextInvoiceNum();
+    document.getElementById('shipTo').value = '';
+    document.getElementById('invoiceItems').innerHTML = '';
+    addLineItem();
+    calculateTotals();
+}
+
     </script>
 
 </body>
