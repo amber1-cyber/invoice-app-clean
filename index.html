@@ -449,8 +449,14 @@
         }
 
         function downloadPDF(event) {
-    const element = document.getElementById('invoicePreview').firstElementChild;
+    const modal = document.getElementById('previewModal');
+    const preview = document.getElementById('invoicePreview');
+    const element = preview.firstElementChild;
     const invoiceNum = document.getElementById('invoiceNumber').value;
+
+    modal.scrollTop = 0;
+    preview.scrollTop = 0;
+    window.scrollTo(0, 0);
 
     const opt = {
         margin: 0,
@@ -461,7 +467,9 @@
             useCORS: true,
             logging: false,
             letterRendering: true,
-            allowTaint: false
+            allowTaint: false,
+            scrollX: 0,
+            scrollY: -window.scrollY
         },
         jsPDF: {
             unit: 'mm',
@@ -486,6 +494,7 @@
         btn.disabled = false;
     });
 }
+
 
 
         function saveInvoice() {
