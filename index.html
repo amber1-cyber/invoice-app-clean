@@ -209,15 +209,11 @@
 
         async function loadClients() {
     const select = document.getElementById('clientSelect');
-    console.log('loadClients started');
 
     const { data: clients, error } = await supabaseClient
         .from('clients')
         .select('*')
         .order('name', { ascending: true });
-
-    console.log('clients:', clients);
-    console.log('error:', error);
 
     select.innerHTML = '<option value="">-- Select Client --</option>';
 
@@ -234,11 +230,8 @@
         option.dataset.email = client.email || '';
         select.appendChild(option);
     });
-
-    console.log('dropdown options count:', select.options.length);
 }
 
-        }
 
         async function addLineItem() {
             const tbody = document.getElementById('invoiceItems');
