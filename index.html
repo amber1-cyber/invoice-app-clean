@@ -19,7 +19,8 @@
             padding: 40px 50px;
             background: white;
             width: 210mm;
-            min-height: 297mm;
+            min-height: auto;
+
         }
         
         @media print {
@@ -452,32 +453,38 @@
             const invoiceNum = document.getElementById('invoiceNumber').value;
             
             const opt = {
-                margin: 0,
-                filename: `Invoice_${invoiceNum}.pdf`,
-                image: { type: 'jpeg', quality: 1 },
-                html2canvas: { 
-                    scale: 4,
-                    useCORS: true, 
-                    logging: false,
-                    letterRendering: true,
-                    allowTaint: false,
-                    width: 794,
-                    height: 1123
-                },
-                jsPDF: { 
-                    unit: 'px', 
-                    format: [794, 1123], 
-                    orientation: 'portrait',
-                    compress: true,
-                    hotfixes: ['px_scaling']
-                },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            };
+    margin: [0, 0, 0, 0],
+    filename: `Invoice_${invoiceNum}.pdf`,
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 794,
+        windowHeight: 1123
+    },
+    jsPDF: {
+        unit: 'px',
+        format: [794, 1123],
+        orientation: 'portrait'
+    },
+    pagebreak: { mode: ['css', 'legacy'] }
+};
+
             
             const btn = event.target.closest('button');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
             btn.disabled = true;
+
+            element.style.margin = '0';
+            element.style.transform = 'none';
+            element.style.position = 'relative';
+            element.style.top = '0';
+
             
             html2pdf().set(opt).from(element).save().then(() => {
                 console.log('PDF generated successfully');
