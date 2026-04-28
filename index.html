@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -166,7 +166,7 @@
                         class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">
                         Close
                     </button>
-                    <button onclick="downloadPDF()" 
+                    <button onclick="downloadPDF(event)" 
                         class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center">
                         <i class="fas fa-file-pdf mr-2"></i>Download PDF
                     </button>
@@ -175,14 +175,19 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+    const SUPABASE_URL = "https://wyqmskohhwminilqjeme.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cW1za29oaHdtaW5pbHFqZW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTUyNjgsImV4cCI6MjA5MjQzMTI2OH0.yGZPHaJpKP-UjTYzXGn6XRNa4PM7tTp59Q6e3mAKYvg";
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    </script>
+
     <script>
         const DB = {
-            getClients() { return JSON.parse(localStorage.getItem('mslo_clients')) || []; },
-            getItems() { return JSON.parse(localStorage.getItem('mslo_items')) || []; },
             getInvoices() { return JSON.parse(localStorage.getItem('mslo_invoices')) || []; },
             getNextInvoiceNum() { return parseInt(localStorage.getItem('mslo_next_inv')) || 1; },
-            saveClients(clients) { localStorage.setItem('mslo_clients', JSON.stringify(clients)); },
-            saveItems(items) { localStorage.setItem('mslo_items', JSON.stringify(items)); },
             saveInvoices(invoices) { localStorage.setItem('mslo_invoices', JSON.stringify(invoices)); },
             saveNextInvoiceNum(num) { localStorage.setItem('mslo_next_inv', num); }
         };
@@ -194,31 +199,59 @@
             return 'R' + parts[0] + '.' + parts[1];
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('invoiceDate').valueAsDate = new Date();
             document.getElementById('dueDate').valueAsDate = new Date();
             document.getElementById('invoiceNumber').value = DB.getNextInvoiceNum();
-            loadClients();
-            addLineItem();
+            await loadClients();
+            await addLineItem();
         });
 
-        function loadClients() {
-            const select = document.getElementById('clientSelect');
-            const clients = DB.getClients();
-            select.innerHTML = '<option value="">-- Select Client --</option>';
-            clients.forEach(client => {
-                const option = document.createElement('option');
-                option.value = client.name;
-                option.textContent = client.name;
-                option.dataset.address = client.address || '';
-                option.dataset.email = client.email || '';
-                select.appendChild(option);
-            });
+        async function loadClients() {
+    const select = document.getElementById('clientSelect');
+    console.log('loadClients started');
+
+    const { data: clients, error } = await supabaseClient
+        .from('clients')
+        .select('*')
+        .order('name', { ascending: true });
+
+    console.log('clients:', clients);
+    console.log('error:', error);
+
+    select.innerHTML = '<option value="">-- Select Client --</option>';
+
+    if (error) {
+        console.error(error);
+        return;
+    }
+
+    clients.forEach(client => {
+        const option = document.createElement('option');
+        option.value = client.name;
+        option.textContent = client.name;
+        option.dataset.address = client.address || '';
+        option.dataset.email = client.email || '';
+        select.appendChild(option);
+    });
+
+    console.log('dropdown options count:', select.options.length);
+}
+
         }
 
-        function addLineItem() {
+        async function addLineItem() {
             const tbody = document.getElementById('invoiceItems');
-            const items = DB.getItems();
+            const { data: items, error } = await supabaseClient
+                .from('stock')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
             tr.innerHTML = `
@@ -421,7 +454,7 @@
             document.getElementById('previewModal').classList.add('hidden');
         }
 
-        function downloadPDF() {
+        function downloadPDF(event) {
             const element = document.getElementById('invoicePreview').firstElementChild;
             const invoiceNum = document.getElementById('invoiceNumber').value;
             
@@ -448,7 +481,7 @@
                 pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
             
-            const btn = event.target;
+            const btn = event.target.closest('button');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
             btn.disabled = true;
@@ -511,15 +544,6 @@
             calculateTotals();
         }
     </script>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script>
-const SUPABASE_URL = "https://wyqmskohhwminilqjeme.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cW1za29oaHdtaW5pbHFqZW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTUyNjgsImV4cCI6MjA5MjQzMTI2OH0.yGZPHaJpKP-UjTYzXGn6XRNa4PM7tTp59Q6e3mAKYvg";
-
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-</script>
 
 </body>
 </html>
