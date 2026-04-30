@@ -55,18 +55,11 @@
     </div>
 
     <script>
-        // Initialize Supabase
-        const supabaseUrl = 'https://wyqmskohhwminilqjeme.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cW1za29oaHdtaW5pbHFqZW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTUyNjgsImV4cCI6MjA5MjQzMTI2OH0.yGZPHaJpKP-UjTYzXGn6XRNa4PM7tTp59Q6e3mAKYvg';
-        
-        let supabase;
-        try {
-            supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-            console.log('✓ Supabase client created');
-        } catch (e) {
-            console.error('✗ Failed to create Supabase client:', e);
-            document.getElementById('status').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed to initialize database client';
-        }
+        // Initialize Supabase ONCE
+        const supabaseClient = window.supabase.createClient(
+            'https://wyqmskohhwminilqjeme.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cW1za29oaHdtaW5pbHFqZW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTUyNjgsImV4cCI6MjA5MjQzMTI2OH0.yGZPHaJpKP-UjTYzXGn6XRNa4PM7tTp59Q6e3mAKYvg'
+        );
 
         function formatCurrency(amount) {
             return 'R' + new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2 }).format(amount || 0);
@@ -78,37 +71,24 @@
             const tbody = document.getElementById('tbody');
 
             try {
-                console.log('Fetching invoices...');
-                statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Fetching invoices from Supabase...';
-
-                // Test the connection
-                const { data: testResult, error: testError } = await supabase
-                    .from('invoices')
-                    .select('invoice_number')
-                    .limit(1);
-
-                if (testError) {
-                    throw new Error('Database error: ' + testError.message);
-                }
-
-                // Fetch all invoices
-                const { data: invoices, error } = await supabase
+                console.log('Fetching invoices from Supabase...');
+                
+                const {  invoices, error } = await supabaseClient
                     .from('invoices')
                     .select('*')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
 
-                console.log('✓ Fetched', invoices?.length || 0, 'invoices');
-                console.log('Sample invoice:', invoices?.[0]);
+                console.log('✓ Found', invoices.length, 'invoices');
 
                 if (!invoices || invoices.length === 0) {
                     statusDiv.className = 'px-6 py-3 bg-yellow-50 text-yellow-800 text-sm';
-                    statusDiv.innerHTML = '<i class="fas fa-info-circle mr-2"></i>Connected successfully. No invoices found.';
+                    statusDiv.innerHTML = '<i class="fas fa-info-circle mr-2"></i>Connected! No invoices found.';
                     return;
                 }
 
-                // Success - display invoices
+                // Success
                 statusDiv.className = 'px-6 py-3 bg-green-50 text-green-800 text-sm';
                 statusDiv.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Connected! Found ${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}`;
                 
@@ -130,20 +110,12 @@
             } catch (err) {
                 console.error('✗ Error:', err);
                 statusDiv.className = 'px-6 py-3 bg-red-50 text-red-800 text-sm';
-                statusDiv.innerHTML = `
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    <strong>Error loading invoices:</strong> ${err.message}<br>
-                    <small>Check browser console (F12) for details</small>
-                `;
+                statusDiv.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Error: ${err.message}`;
             }
         }
 
-        // Load when page is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadInvoices);
-        } else {
-            loadInvoices();
-        }
+        // Load on page ready
+        document.addEventListener('DOMContentLoaded', loadInvoices);
     </script>
 </body>
 </html>
