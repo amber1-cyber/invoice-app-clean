@@ -7,10 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-    </style>
 </head>
 <body class="bg-gray-50">
     <nav class="bg-white shadow-md border-b border-gray-200">
@@ -20,9 +16,9 @@
                     <h1 class="text-2xl font-bold text-gray-800">MSLO Invoice System</h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="index.html" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Generator</a>
-                    <a href="history.html" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">History</a>
-                    <a href="manage.html" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Manage</a>
+                    <a href="index.html" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Generator</a>
+                    <a href="history.html" class="px-4 py-2 bg-gray-600 text-white rounded-lg">History</a>
+                    <a href="manage.html" class="px-4 py-2 bg-green-600 text-white rounded-lg">Manage</a>
                 </div>
             </div>
         </div>
@@ -31,11 +27,11 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-white rounded-lg shadow">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-history mr-2"></i>Invoice History</h2>
+                <h2 class="text-xl font-bold"><i class="fas fa-history mr-2"></i>Invoice History</h2>
             </div>
             
-            <div id="status" class="px-6 py-3 bg-blue-50 text-blue-800 text-sm">
-                <i class="fas fa-spinner fa-spin mr-2"></i>Connecting to database...
+            <div id="status" class="px-6 py-3 text-sm">
+                <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
             </div>
 
             <div class="overflow-x-auto">
@@ -48,14 +44,13 @@
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
                         </tr>
                     </thead>
-                    <tbody id="tbody" class="divide-y divide-gray-200"></tbody>
+                    <tbody id="tbody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        // Initialize Supabase ONCE
         const supabaseClient = window.supabase.createClient(
             'https://wyqmskohhwminilqjeme.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5cW1za29oaHdtaW5pbHFqZW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTUyNjgsImV4cCI6MjA5MjQzMTI2OH0.yGZPHaJpKP-UjTYzXGn6XRNa4PM7tTp59Q6e3mAKYvg'
@@ -71,50 +66,51 @@
             const tbody = document.getElementById('tbody');
 
             try {
-                console.log('Fetching invoices from Supabase...');
+                console.log('Querying Supabase...');
                 
-                const {  invoices, error } = await supabaseClient
+                const response = await supabaseClient
                     .from('invoices')
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (error) throw error;
+                console.log('Raw response:', response);
 
-                console.log('✓ Found', invoices.length, 'invoices');
+                if (response.error) {
+                    throw new Error(response.error.message);
+                }
 
-                if (!invoices || invoices.length === 0) {
-                    statusDiv.className = 'px-6 py-3 bg-yellow-50 text-yellow-800 text-sm';
-                    statusDiv.innerHTML = '<i class="fas fa-info-circle mr-2"></i>Connected! No invoices found.';
+                const invoices = response.data || [];
+                console.log('Invoices:', invoices);
+
+                if (invoices.length === 0) {
+                    statusDiv.className = 'px-6 py-3 bg-yellow-50 text-yellow-800';
+                    statusDiv.innerHTML = '<i class="fas fa-info-circle mr-2"></i>No invoices found';
                     return;
                 }
 
-                // Success
-                statusDiv.className = 'px-6 py-3 bg-green-50 text-green-800 text-sm';
-                statusDiv.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Connected! Found ${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}`;
+                statusDiv.className = 'px-6 py-3 bg-green-50 text-green-800';
+                statusDiv.innerHTML = `<i class="fas fa-check mr-2"></i>Found ${invoices.length} invoice(s)`;
                 
                 table.style.display = 'table';
                 tbody.innerHTML = invoices.map(inv => {
-                    const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-ZA') : 
-                                   inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-ZA') : 'N/A';
-                    
+                    const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-ZA') : 'N/A';
                     return `
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 font-medium text-gray-900">${inv.invoice_number || 'N/A'}</td>
-                            <td class="px-6 py-4 text-gray-600">${invDate}</td>
-                            <td class="px-6 py-4 text-gray-600">${inv.client || 'N/A'}</td>
-                            <td class="px-6 py-4 text-right font-semibold text-gray-900">${formatCurrency(inv.total)}</td>
+                            <td class="px-6 py-4 font-medium">${inv.invoice_number || 'N/A'}</td>
+                            <td class="px-6 py-4">${invDate}</td>
+                            <td class="px-6 py-4">${inv.client || 'N/A'}</td>
+                            <td class="px-6 py-4 text-right font-semibold">${formatCurrency(inv.total)}</td>
                         </tr>
                     `;
                 }).join('');
 
             } catch (err) {
-                console.error('✗ Error:', err);
-                statusDiv.className = 'px-6 py-3 bg-red-50 text-red-800 text-sm';
+                console.error('Error:', err);
+                statusDiv.className = 'px-6 py-3 bg-red-50 text-red-800';
                 statusDiv.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Error: ${err.message}`;
             }
         }
 
-        // Load on page ready
         document.addEventListener('DOMContentLoaded', loadInvoices);
     </script>
 </body>
