@@ -29,10 +29,6 @@
             <div class="px-6 py-4 border-b border-gray-200">
                 <h2 class="text-xl font-bold"><i class="fas fa-history mr-2"></i>Invoice History</h2>
             </div>
-            
-            <div id="status" class="px-6 py-3 text-sm">
-                <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
-            </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full" id="table" style="display:none;">
@@ -46,6 +42,11 @@
                     </thead>
                     <tbody id="tbody"></tbody>
                 </table>
+            </div>
+            
+            <div id="noInvoices" class="hidden px-6 py-12 text-center text-gray-500">
+                <i class="fas fa-inbox text-4xl mb-2"></i>
+                <p>No invoices found</p>
             </div>
         </div>
     </div>
@@ -61,36 +62,25 @@
         }
 
         async function loadInvoices() {
-            const statusDiv = document.getElementById('status');
             const table = document.getElementById('table');
             const tbody = document.getElementById('tbody');
+            const noInvoices = document.getElementById('noInvoices');
 
             try {
-                console.log('Querying Supabase...');
-                
                 const response = await supabaseClient
                     .from('invoices')
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                console.log('Raw response:', response);
-
-                if (response.error) {
-                    throw new Error(response.error.message);
-                }
+                if (response.error) throw response.error;
 
                 const invoices = response.data || [];
-                console.log('Invoices:', invoices);
 
                 if (invoices.length === 0) {
-                    statusDiv.className = 'px-6 py-3 bg-yellow-50 text-yellow-800';
-                    statusDiv.innerHTML = '<i class="fas fa-info-circle mr-2"></i>No invoices found';
+                    noInvoices.classList.remove('hidden');
                     return;
                 }
 
-                statusDiv.className = 'px-6 py-3 bg-green-50 text-green-800';
-                statusDiv.innerHTML = `<i class="fas fa-check mr-2"></i>Found ${invoices.length} invoice(s)`;
-                
                 table.style.display = 'table';
                 tbody.innerHTML = invoices.map(inv => {
                     const invDate = inv.date ? new Date(inv.date).toLocaleDateString('en-ZA') : 'N/A';
@@ -106,8 +96,6 @@
 
             } catch (err) {
                 console.error('Error:', err);
-                statusDiv.className = 'px-6 py-3 bg-red-50 text-red-800';
-                statusDiv.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Error: ${err.message}`;
             }
         }
 
