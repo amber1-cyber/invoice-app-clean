@@ -6,7 +6,23 @@
     <title>MSLO - Invoice History</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .invoice-container {
+            font-family: 'Inter', sans-serif;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 50px;
+            background: white;
+            width: 210mm;
+            min-height: auto;
+        }
+        @media print { .no-print { display: none !important; } }
+    </style>
 </head>
 <body class="bg-gray-50">
     <nav class="bg-white shadow-md border-b border-gray-200">
@@ -45,6 +61,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase no-print">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="tbody"></tbody>
@@ -58,6 +75,30 @@
         </div>
     </div>
 
+    <!-- Preview Modal -->
+    <div id="previewModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 overflow-auto">
+        <div class="min-h-screen px-4 py-8">
+            <div class="bg-white rounded-lg shadow-2xl max-w-5xl mx-auto">
+                <div class="bg-gray-800 text-white px-6 py-4 flex justify-between items-center no-print">
+                    <h3 class="text-lg font-semibold">Invoice Preview</h3>
+                    <button onclick="closePreview()" class="text-gray-300 hover:text-white">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div id="invoicePreview" class="bg-white overflow-auto"></div>
+                <div class="bg-gray-50 px-6 py-4 flex justify-end space-x-3 no-print">
+                    <button onclick="closePreview()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition">Close</button>
+                    <button onclick="downloadPDF()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center">
+                        <i class="fas fa-file-pdf mr-2"></i>Download PDF
+                    </button>
+                    <button onclick="sendViaEmail()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center">
+                        <i class="fas fa-envelope mr-2"></i>Send via Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const supabaseClient = window.supabase.createClient(
             'https://wyqmskohhwminilqjeme.supabase.co',
@@ -67,6 +108,8 @@
         function formatCurrency(amount) {
             return 'R' + new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2 }).format(amount || 0);
         }
+
+        let currentInvoice = null;
 
         async function loadInvoices() {
             const table = document.getElementById('table');
@@ -97,6 +140,20 @@
                             <td class="px-6 py-4">${invDate}</td>
                             <td class="px-6 py-4">${inv.client || 'N/A'}</td>
                             <td class="px-6 py-4 text-right font-semibold">${formatCurrency(inv.total)}</td>
+                            <td class="px-6 py-4 text-center no-print">
+                                <button onclick='viewInvoice(${JSON.stringify(inv).replace(/'/g, "&#39;")})' 
+                                    class="text-blue-600 hover:text-blue-900 mr-3" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button onclick='downloadInvoice(${JSON.stringify(inv).replace(/'/g, "&#39;")})' 
+                                    class="text-red-600 hover:text-red-900 mr-3" title="Download PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </button>
+                                <button onclick='emailInvoice(${JSON.stringify(inv).replace(/'/g, "&#39;")})' 
+                                    class="text-green-600 hover:text-green-900" title="Send via Email">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
@@ -104,6 +161,184 @@
             } catch (err) {
                 console.error('Error:', err);
             }
+        }
+
+        async function viewInvoice(inv) {
+            currentInvoice = inv;
+            
+            // Fetch client details for email
+            let clientEmail = '';
+            if (inv.client) {
+                const { data } = await supabaseClient.from('clients').select('*').eq('name', inv.client).single();
+                if (data) clientEmail = data.email || '';
+            }
+
+            const formattedDate = inv.date ? new Date(inv.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
+            const formattedDue = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
+            const items = inv.items || [];
+
+            const previewHTML = `
+                <div class="invoice-container" style="padding:40px 50px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px; border-bottom:2px solid #2563eb; padding-bottom:20px;">
+                        <div>
+                            <img src="logo.png" style="height:60px; width:auto; object-fit:contain;" onerror="this.style.display='none'">
+                            <h1 style="font-size:36px; font-weight:700; color:#1e40af; margin:10px 0 5px 0;">INVOICE</h1>
+                            <p style="font-size:20px; font-weight:600; color:#111827; margin:0;">MSLO</p>
+                        </div>
+                        <div style="text-align:right; font-size:13px; color:#6b7280; line-height:1.6;">
+                            <p>18 swimmer road 23 Silvamonte village</p>
+                            <p>Johannesburg, Gauteng 2192</p>
+                            <p>South Africa</p>
+                            <p style="margin-top:8px;">0824141101</p>
+                            <p>www.mslo.co.za</p>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-bottom:30px;">
+                        <div>
+                            <h3 style="font-weight:600; color:#374151; border-bottom:1px solid #d1d5db; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; font-size:13px;">Bill To</h3>
+                            <p style="font-weight:600; color:#111827; margin:0; font-size:15px;">${inv.client || ''}</p>
+                        </div>
+                        <div>
+                            <h3 style="font-weight:600; color:#374151; border-bottom:1px solid #d1d5db; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; font-size:13px;">Ship To</h3>
+                            <p style="font-size:13px; color:#374151; margin:0; line-height:1.5; white-space:pre-line;">${inv.ship || inv.client || ''}</p>
+                        </div>
+                    </div>
+                    <div style="background-color:#f9fafb; padding:10px 15px; border-radius:4px; margin-bottom:20px; font-size:14px; font-weight:500; color:#374151; display:flex; justify-content:space-between;">
+                        <div><span style="color:#6b7280;">Invoice Number:</span> <strong>${inv.invoice_number}</strong></div>
+                        <div><span style="color:#6b7280;">Invoice Date:</span> <strong>${formattedDate}</strong></div>
+                        <div><span style="color:#6b7280;">Payment Due:</span> <strong>${formattedDue}</strong></div>
+                    </div>
+                    <div style="background-color:#eff6ff; padding:8px 15px; border-radius:4px; margin-bottom:30px; border-left:4px solid #2563eb; display:flex; align-items:center;">
+                        <p style="margin:0; font-size:14px; font-weight:600; color:#1e40af;">
+                            Amount Due (ZAR): <span style="font-size:16px; font-weight:700; margin-left:8px;">${formatCurrency(inv.total)}</span>
+                        </p>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:30px;">
+                        <thead style="background-color:#f3f4f6;">
+                            <tr>
+                                <th style="padding:10px; text-align:left; font-weight:600; color:#4b5563; text-transform:uppercase; font-size:11px; width:50%;">Items</th>
+                                <th style="padding:10px; text-align:center; font-weight:600; color:#4b5563; text-transform:uppercase; font-size:11px;">Quantity</th>
+                                <th style="padding:10px; text-align:right; font-weight:600; color:#4b5563; text-transform:uppercase; font-size:11px;">Price</th>
+                                <th style="padding:10px; text-align:right; font-weight:600; color:#4b5563; text-transform:uppercase; font-size:11px;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map((item, index) => `
+                                <tr style="${index < items.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : ''}">
+                                    <td style="padding:10px; color:#1f2937; font-size:14px;">${item.description}</td>
+                                    <td style="padding:10px; text-align:center; color:#6b7280; font-size:14px;">${item.quantity}</td>
+                                    <td style="padding:10px; text-align:right; color:#6b7280; font-size:14px;">${formatCurrency(item.price)}</td>
+                                    <td style="padding:10px; text-align:right; font-weight:500; color:#111827; font-size:14px;">${formatCurrency(item.total)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div style="border-top:1px solid #e5e7eb; padding-top:10px; margin-bottom:30px;">
+                        <div style="display:flex; justify-content:flex-end;">
+                            <div style="width:200px;">
+                                <div style="display:flex; justify-content:space-between; padding:5px 0; font-weight:600;">
+                                    <span>Total:</span>
+                                    <span>${formatCurrency(inv.total)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <h4 style="font-weight:600; color:#374151; border-bottom:1px solid #d1d5db; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; font-size:13px;">Notes/ Terms</h4>
+                        <p style="font-size:13px; color:#6b7280; margin:0;">Payment is due upon receipt of invoice.</p>
+                    </div>
+                    <div style="background-color:#f9fafb; padding:15px; border-radius:4px; border:1px solid #e5e7eb;">
+                        <h4 style="font-weight:700; color:#374151; margin:0 0 10px 0; font-size:14px;">Banking Details:</h4>
+                        <div style="display:flex; flex-direction:column; gap:4px; color:#6b7280; font-size:13px;">
+                            <p style="margin:0;"><span style="font-weight:600;">Bank:</span> First National Bank</p>
+                            <p style="margin:0;"><span style="font-weight:600;">Acc no:</span> 63019145514</p>
+                            <p style="margin:0;"><span style="font-weight:600;">Branch code:</span> 212217</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('invoicePreview').innerHTML = previewHTML;
+            document.getElementById('previewModal').classList.remove('hidden');
+            
+            // Store client email for sending
+            window.currentClientEmail = clientEmail;
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').classList.add('hidden');
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('invoicePreview').firstElementChild;
+            if (!element) { alert('Please preview the invoice first.'); return; }
+
+            const invoiceNum = currentInvoice?.invoice_number || document.getElementById('invoiceNumber').value || '000';
+            const invoiceDate = currentInvoice?.date || document.getElementById('invoiceDate').value || new Date().toISOString().split('T')[0];
+            const fileName = `Invoice_${invoiceNum}_${invoiceDate}.pdf`;
+
+            const opt = {
+                margin: [10, 10, 10, 10],
+                filename: fileName,
+                image: { type: 'jpeg', quality: 0.75 },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: false,
+                    logging: false, 
+                    letterRendering: true, 
+                    allowTaint: false,
+                    backgroundColor: '#ffffff'
+                },
+                jsPDF: { 
+                    unit: 'mm', 
+                    format: 'a4', 
+                    orientation: 'portrait',
+                    compress: true
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            html2pdf().set(opt).from(element).save().catch(err => {
+                console.error('Error:', err);
+                alert('Error generating PDF');
+            });
+        }
+
+        async function downloadInvoice(inv) {
+            await viewInvoice(inv);
+            setTimeout(() => downloadPDF(), 300);
+        }
+
+        async function emailInvoice(inv) {
+            await viewInvoice(inv);
+            
+            const subject = encodeURIComponent(`Invoice ${inv.invoice_number} from MSLO`);
+            const body = encodeURIComponent(
+                `Dear ${inv.client},\n\n` +
+                `Please find attached invoice ${inv.invoice_number} for ${formatCurrency(inv.total)}.\n\n` +
+                `Invoice Date: ${inv.date}\n` +
+                `Payment Due: ${inv.due_date}\n\n` +
+                `Banking Details:\n` +
+                `Bank: First National Bank\n` +
+                `Acc no: 63019145514\n` +
+                `Branch code: 212217\n\n` +
+                `Please download the attached PDF invoice.\n\n` +
+                `Thank you,\nMSLO\n0824141101\nwww.mslo.co.za`
+            );
+            
+            // Open default email client (Outlook if set as default)
+            window.location.href = `mailto:${window.currentClientEmail || ''}?subject=${subject}&body=${body}`;
+            
+            // Also download the PDF so user can attach it
+            setTimeout(() => {
+                downloadPDF();
+                alert('PDF downloaded! Please attach it to your email before sending.');
+            }, 500);
+        }
+
+        function sendViaEmail() {
+            if (!currentInvoice) return;
+            emailInvoice(currentInvoice);
         }
 
         document.addEventListener('DOMContentLoaded', loadInvoices);
