@@ -452,37 +452,32 @@
     const modal = document.getElementById('previewModal');
     const preview = document.getElementById('invoicePreview');
     const element = preview.firstElementChild;
-
-    if (!element) {
-        alert('Please preview the invoice first.');
-        return;
-    }
+    if (!element) { alert('Please preview the invoice first.'); return; }
 
     const invoiceNum = document.getElementById('invoiceNumber').value || '000';
     const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().split('T')[0];
     const fileName = `Invoice_${invoiceNum}_${invoiceDate}.pdf`;
 
-    modal.scrollTop = 0;
-    preview.scrollTop = 0;
-    window.scrollTo(0, 0);
+    modal.scrollTop = 0; preview.scrollTop = 0; window.scrollTo(0, 0);
 
+    // OPTIMIZED SETTINGS FOR SMALLER FILE SIZE
     const opt = {
-        margin: 0,
+        margin: [10, 10, 10, 10],
         filename: fileName,
-        image: { type: 'png', quality: 1 },
-        html2canvas: {
-            scale: 4,
-            useCORS: true,
-            logging: false,
-            letterRendering: true,
+        image: { type: 'jpeg', quality: 0.75 },  // Reduced from 1.0 to 0.75
+        html2canvas: { 
+            scale: 2,  // Reduced from 4 to 2 (still good quality, much smaller file)
+            useCORS: false,
+            logging: false, 
+            letterRendering: true, 
             allowTaint: false,
-            scrollX: 0,
-            scrollY: -window.scrollY
+            backgroundColor: '#ffffff'
         },
-        jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
+        jsPDF: { 
+            unit: 'mm', 
+            format: 'a4', 
+            orientation: 'portrait',
+            compress: true  // Enable PDF compression
         },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
@@ -493,18 +488,15 @@
     btn.disabled = true;
 
     html2pdf().set(opt).from(element).save().then(() => {
-        btn.innerHTML = originalText;
+        btn.innerHTML = originalText; 
         btn.disabled = false;
     }).catch(err => {
-        console.error('Error generating PDF:', err);
-        alert('Error generating PDF.');
-        btn.innerHTML = originalText;
+        console.error('Error:', err);
+        alert('Error generating PDF');
+        btn.innerHTML = originalText; 
         btn.disabled = false;
     });
 }
-
-
-
 
         async function saveInvoice() {
     const clientName = document.getElementById('clientSelect').value;
